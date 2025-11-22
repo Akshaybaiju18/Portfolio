@@ -5,6 +5,7 @@ const express = require('express');
 const router = express.Router();
 const Project = require('../models/Project');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { cacheMiddleware, invalidateResourceCache } = require('../middleware/cache');
 
 // Helper function to create slug
 const createSlug = (title) => {
@@ -15,7 +16,7 @@ const createSlug = (title) => {
 };
 
 // GET /api/projects - Get projects (PUBLIC + ADMIN)
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware(3600), async (req, res) => {
   try {
     console.log('🔍 Projects GET - Query params:', req.query);
     
@@ -68,7 +69,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/projects/:identifier - Get single project by slug or ID
-router.get('/:identifier', async (req, res) => {
+router.get('/:identifier', cacheMiddleware(3600), async (req, res) => {
   try {
     const { identifier } = req.params;
     
@@ -131,6 +132,9 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     const project = new Project(projectData);
     await project.save();
 
+    // Invalidate projects cache
+    await invalidateResourceCache('projects');
+
     console.log('✅ Project created:', project.title, 'with slug:', project.slug);
 
     res.status(201).json({
@@ -190,6 +194,9 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
       });
     }
 
+    // Invalidate projects cache
+    await invalidateResourceCache('projects');
+
     console.log('✅ Project updated:', project.title);
 
     res.json({
@@ -217,6 +224,9 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         message: 'Project not found'
       });
     }
+
+    // Invalidate projects cache
+    await invalidateResourceCache('projects');
 
     console.log('✅ Project deleted:', project.title);
 

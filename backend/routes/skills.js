@@ -5,9 +5,10 @@ const express = require('express');
 const router = express.Router();
 const Skill = require('../models/Skill');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { cacheMiddleware, invalidateResourceCache } = require('../middleware/cache');
 
 // GET /api/skills - Get all skills (PUBLIC - for portfolio display)
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware(3600), async (req, res) => {
   try {
     const {
       category,
@@ -64,7 +65,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/skills/categories - Get all skill categories (PUBLIC)
-router.get('/categories', async (req, res) => {
+router.get('/categories', cacheMiddleware(7200), async (req, res) => {
   try {
     const categories = await Skill.distinct('category');
     const categoryStats = await Skill.aggregate([
@@ -88,7 +89,7 @@ router.get('/categories', async (req, res) => {
 });
 
 // GET /api/skills/:id - Get single skill (PUBLIC - for admin editing)
-router.get('/:id', async (req, res) => {
+router.get('/:id', cacheMiddleware(3600), async (req, res) => {
   try {
     const skill = await Skill.findById(req.params.id)
       .populate('projects', 'title slug shortDescription')
@@ -121,6 +122,9 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const skill = new Skill(req.body);
     await skill.save();
+
+    // Invalidate skills cache
+    await invalidateResourceCache('skills');
 
     res.status(201).json({
       success: true,
@@ -169,6 +173,9 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
       });
     }
 
+    // Invalidate skills cache
+    await invalidateResourceCache('skills');
+
     res.json({
       success: true,
       message: 'Skill updated successfully',
@@ -194,6 +201,9 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         message: 'Skill not found'
       });
     }
+
+    // Invalidate skills cache
+    await invalidateResourceCache('skills');
 
     res.json({
       success: true,

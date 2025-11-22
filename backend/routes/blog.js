@@ -5,6 +5,7 @@ const express = require('express');
 const router = express.Router();
 const BlogPost = require('../models/BlogPost');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { cacheMiddleware, invalidateResourceCache } = require('../middleware/cache');
 
 // Helper function to create slug
 const createSlug = (title) => {
@@ -15,7 +16,7 @@ const createSlug = (title) => {
 };
 
 // GET /api/blog - Get all blog posts (PUBLIC + ADMIN)
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware(3600), async (req, res) => {
   try {
     console.log('🔍 Blog GET - Query params:', req.query);
     
@@ -93,7 +94,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/blog/categories - Get all blog categories
-router.get('/categories', async (req, res) => {
+router.get('/categories', cacheMiddleware(7200), async (req, res) => {
   try {
     const categories = await BlogPost.distinct('category');
     res.json({
@@ -110,7 +111,7 @@ router.get('/categories', async (req, res) => {
 });
 
 // GET /api/blog/tags - Get all blog tags
-router.get('/tags', async (req, res) => {
+router.get('/tags', cacheMiddleware(7200), async (req, res) => {
   try {
     const tags = await BlogPost.aggregate([
       { $unwind: '$tags' },
@@ -132,7 +133,7 @@ router.get('/tags', async (req, res) => {
 });
 
 // GET /api/blog/:identifier - Get single blog post by slug or ID
-router.get('/:identifier', async (req, res) => {
+router.get('/:identifier', cacheMiddleware(3600), async (req, res) => {
   try {
     const { identifier } = req.params;
     
@@ -205,6 +206,9 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     const post = new BlogPost(postData);
     await post.save();
 
+    // Invalidate blog cache
+    await invalidateResourceCache('blog');
+
     console.log('✅ Blog post created:', post.title, 'with slug:', post.slug);
 
     res.status(201).json({
@@ -264,6 +268,9 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
       });
     }
 
+    // Invalidate blog cache
+    await invalidateResourceCache('blog');
+
     console.log('✅ Blog post updated:', post.title);
 
     res.json({
@@ -291,6 +298,9 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         message: 'Blog post not found'
       });
     }
+
+    // Invalidate blog cache
+    await invalidateResourceCache('blog');
 
     console.log('✅ Blog post deleted:', post.title);
 

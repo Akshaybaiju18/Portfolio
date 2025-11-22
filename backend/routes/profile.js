@@ -8,6 +8,7 @@ const Profile = require('../models/Profile');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const { cacheMiddleware, invalidateRouteCache } = require('../middleware/cache');
 
 // Configure Cloudinary with environment variables
 cloudinary.config({
@@ -46,7 +47,7 @@ const resumeUpload = multer({
 });
 
 // GET /api/profile - Get active profile (PUBLIC)
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware(3600), async (req, res) => {
   try {
     const profile = await Profile.findOne({ isActive: true });
     
@@ -116,6 +117,9 @@ router.put('/', authenticateToken, requireAdmin, async (req, res) => {
 
     await profile.save();
 
+    // Invalidate profile cache
+    await invalidateRouteCache('profile');
+
     res.json({
       success: true,
       message: 'Profile updated successfully',
@@ -164,6 +168,9 @@ router.post('/upload-image', authenticateToken, requireAdmin, imageUpload.single
     profile.profileImage = imageUrl;
     await profile.save();
 
+    // Invalidate profile cache
+    await invalidateRouteCache('profile');
+
     res.json({
       success: true,
       message: 'Profile image uploaded successfully',
@@ -203,6 +210,9 @@ router.post('/upload-resume', authenticateToken, requireAdmin, resumeUpload.sing
 
     profile.resumeUrl = resumeUrl;
     await profile.save();
+
+    // Invalidate profile cache
+    await invalidateRouteCache('profile');
 
     res.json({
       success: true,

@@ -11,6 +11,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const profileRoutes = require('./routes/profile');
+const { initRedis } = require('./utils/redis');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -77,12 +78,17 @@ app.get('/', (req, res) => {
 
 const startServer = async () => {
   await connectDB();
+  
+  // Initialize Redis connection
+  await initRedis();
+  
   app.listen(PORT, () => {
     console.log('🚀=================================🚀');
     console.log(`🎯 Portfolio CMS Backend Server`);
     console.log(`📡 Server running on port: ${PORT}`);
     console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
     console.log(`☁️ Storage: Cloudinary`);
+    console.log(`💾 Cache: Redis`);
     console.log('🚀=================================🚀');
   });
 };
